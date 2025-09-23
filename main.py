@@ -99,12 +99,16 @@ async def upload_image(image: UploadFile = File(...), device_id: str = None):
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(image.file, buffer)
     
+    # Copy image to static directory for serving
+    static_file_path = os.path.join(STATIC_DIR, filename)
+    shutil.copy2(file_path, static_file_path)
+    
     # Store metadata
     metadata = ImageMetadata(
         device_id=device_id,
         filename=filename,
         upload_time=datetime.now(),
-        file_path=file_path
+        file_path=static_file_path
     )
     image_metadata.append(metadata)
     
@@ -115,7 +119,11 @@ async def upload_image(image: UploadFile = File(...), device_id: str = None):
         device_images.sort(key=lambda x: x.upload_time)
         for old_img in device_images[:-20]:
             try:
+                # Remove both static and upload files
                 os.remove(old_img.file_path)
+                upload_file_path = os.path.join(UPLOAD_DIR, old_img.filename)
+                if os.path.exists(upload_file_path):
+                    os.remove(upload_file_path)
                 image_metadata.remove(old_img)
             except FileNotFoundError:
                 pass
@@ -174,6 +182,22 @@ async def cleanup_orphaned(request: CleanupRequest):
                 pass
     
     return {"message": f"Cleaned up {removed_count} orphaned files", "removed_count": removed_count}
+
+@app.get("/api/images")
+async def get_all_images(limit: int = 20):
+    """Get recent images from all devices"""
+    all_images = []
+    for img in image_metadata:
+        all_images.append({
+            "device_id": img.device_id,
+            "filename": img.filename,
+            "upload_time": img.upload_time,
+            "url": f"/static/{img.filename}"
+        })
+    
+    # Sort by upload time and limit
+    all_images.sort(key=lambda x: x["upload_time"], reverse=True)
+    return {"images": all_images[:limit]}
 
 @app.get("/api/status")
 async def get_system_status():

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, Form
+from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -85,8 +85,23 @@ async def get_devices():
     return {"devices": device_status}
 
 @app.post("/api/upload-image")
-async def upload_image(image: UploadFile = File(...), device_id: str = Form(...)):
+async def upload_image(request: Request):
     """Upload image from Raspberry Pi"""
+    form = await request.form()
+    
+    # Debug: print form keys
+    print(f"Form keys: {list(form.keys())}")
+    
+    # Get the image file and device_id from form data
+    image = form.get("image")
+    device_id = form.get("device_id")
+    
+    print(f"Device ID received: {device_id}")
+    print(f"Image received: {image is not None}")
+    
+    if not image or not hasattr(image, 'file'):
+        raise HTTPException(status_code=400, detail="image file is required")
+    
     if not device_id:
         raise HTTPException(status_code=400, detail="device_id is required")
     

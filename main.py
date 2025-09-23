@@ -71,12 +71,15 @@ async def heartbeat(request: HeartbeatRequest):
 @app.get("/api/devices")
 async def get_devices():
     """Get all devices and their status"""
-    # Clean up old devices (offline for more than 5 minutes)
-    cutoff_time = datetime.now() - timedelta(minutes=5)
+    # Clean up old devices (offline for more than 5 minutes, disconnected for more than 10 minutes)
+    cutoff_time_offline = datetime.now() - timedelta(minutes=5)
+    cutoff_time_disconnected = datetime.now() - timedelta(minutes=10)
     devices_to_remove = []
     
     for device_id, status in device_status.items():
-        if status["status"] == "offline" and status["last_seen"] < cutoff_time:
+        if status["status"] == "offline" and status["last_seen"] < cutoff_time_offline:
+            devices_to_remove.append(device_id)
+        elif status["status"] == "disconnected" and status["last_seen"] < cutoff_time_disconnected:
             devices_to_remove.append(device_id)
     
     for device_id in devices_to_remove:
